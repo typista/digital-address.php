@@ -2,8 +2,8 @@
 /**
  * php/index.php
  *
- * - /api で呼ばれたとき：Japan Post Digital Address API のプロキシ（JSON返却）
- * - それ以外：shared/frontend/index.html を返す（画面表示）
+ * - /api に来たリクエストを Japan Post Digital Address API へプロキシする
+ * - それ以外は shared/frontend/index.html を返す（画面表示）
  *
  * 前提となるファイル／ディレクトリ：
  * - shared/frontend/index.html

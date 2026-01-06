@@ -1,3 +1,15 @@
+/**
+ * node/index.js
+ *
+ * - /api に来たリクエストを Japan Post Digital Address API へプロキシする
+ * - それ以外は shared/frontend/index.html を返す（画面表示）
+ *
+ * 前提となるファイル／ディレクトリ：
+ * - shared/frontend/index.html
+ * - shared/config/credentials.json（ユーザーが配置）
+ * - shared/runtime/access_token.json（自動生成）
+ */
+
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
@@ -6,20 +18,21 @@ const ROOT_DIR = path.join(__dirname, "..");
 const SHARED_DIR = path.join(ROOT_DIR, "shared");
 const FRONTEND_DIR = path.join(SHARED_DIR, "frontend");
 const FRONTEND_HTML = path.join(FRONTEND_DIR, "index.html");
-const RUNTIME_DIR = path.join(SHARED_DIR, "runtime");
 const CONFIG_DIR = path.join(SHARED_DIR, "config");
-
-const TOKEN_FILE = path.join(RUNTIME_DIR, "access_token.json");
+const RUNTIME_DIR = path.join(SHARED_DIR, "runtime");
 const CREDENTIALS_FILE = path.join(CONFIG_DIR, "credentials.json");
+const TOKEN_FILE = path.join(RUNTIME_DIR, "access_token.json");
 
 const app = express();
 const HOST = process.env.HOST ?? "0.0.0.0";
 const PORT = Number(process.env.PORT ?? 8000);
 
+/* ========= ミドルウェア ========= */
+
 // 静的ファイル（shared/frontend）を配信
 app.use(express.static(FRONTEND_DIR));
 
-// CORS（必要なら。index.htmlと同一オリジンなら本来不要ですが、残してもOK）
+// CORS（API用）
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "*");
@@ -27,29 +40,35 @@ app.use((req, res, next) => {
   next();
 });
 
-// GET以外は204（PHP互換）
+// GET以外は 204（元処理と同等）
 app.use((req, res, next) => {
-  if (req.method !== "GET") return res.status(204).end();
+  if (req.method !== "GET") {
+    res.status(204).end();
+    return;
+  }
   next();
 });
 
-// /api をAPIとして扱う
+/* ========= API処理 ========= */
+
 app.get("/api", async (req, res) => {
   const searchCode = req.query.search_code ?? "";
 
-  // token読み込み
+  // Token確保（キャッシュ→なければ取得）
   let token = null;
   if (fs.existsSync(TOKEN_FILE)) {
+    // キャッシュがあれば利用
     try {
       const obj = JSON.parse(fs.readFileSync(TOKEN_FILE, "utf8"));
       const mtimeSec = Math.floor(fs.statSync(TOKEN_FILE).mtimeMs / 1000);
       if (Math.floor(Date.now() / 1000) < mtimeSec + obj.expires_in) {
         token = obj.token;
       }
-    } catch {}
+    } catch {
+      token = null;
+    }
   }
 
-  // tokenなければ取得
   if (!token) {
     if (!fs.existsSync(CREDENTIALS_FILE)) {
       res.status(500).json({ error: "credentials.json not found" });
@@ -57,7 +76,7 @@ app.get("/api", async (req, res) => {
     }
 
     const credentials = fs.readFileSync(CREDENTIALS_FILE, "utf8");
-    const tResp = await fetch("https://api.da.pf.japanpost.jp/api/v1/j/token", {
+    const tokenResp = await fetch("https://api.da.pf.japanpost.jp/api/v1/j/token", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -66,49 +85,54 @@ app.get("/api", async (req, res) => {
       body: credentials
     });
 
-    const tText = await tResp.text();
-    if (tResp.status !== 200) {
-      res.status(tResp.status).type("application/json").send(tText);
+    const bodyText = await tokenResp.text();
+    if (tokenResp.status !== 200) {
+      res.status(tokenResp.status).type("application/json").send(bodyText);
       return;
     }
 
     fs.mkdirSync(RUNTIME_DIR, { recursive: true });
-    fs.writeFileSync(TOKEN_FILE, tText, "utf8");
-    token = JSON.parse(tText).token;
+    fs.writeFileSync(TOKEN_FILE, bodyText, "utf8");
+    token = JSON.parse(bodyText).token;
   }
 
   res.type("application/json");
 
-  // PHPの正規表現意図（安全に）：数字(3〜7桁) or 英数字7文字
+  // 元コードの正規表現を関数化して判定
   const isZipOrCode = /^(\d{3,7})$/.test(searchCode) || /^(\w{7})$/.test(searchCode);
 
   try {
     if (isZipOrCode) {
+      // GET /searchcode/{search_code}
       const apiResp = await fetch(
         `https://api.da.pf.japanpost.jp/api/v1/searchcode/${encodeURIComponent(searchCode)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const body = await apiResp.text();
       res.status(apiResp.status).send(body);
-    } else {
-      const apiResp = await fetch("https://api.da.pf.japanpost.jp/api/v1/addresszip", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ freeword: searchCode })
-      });
-      const body = await apiResp.text();
-      res.status(apiResp.status).send(body);
+      return;
     }
-  } catch (e) {
-    res.status(500).json({ error: "internal_error", message: String(e) });
+
+    // POST /addresszip
+    const apiResp = await fetch("https://api.da.pf.japanpost.jp/api/v1/addresszip", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ freeword: searchCode })
+    });
+    const body = await apiResp.text();
+    res.status(apiResp.status).send(body);
+  } catch (error) {
+    res.status(500).json({ error: "internal_error", message: String(error) });
   }
 });
 
-// ルートに来たら index.html を返す
-app.get("/", (req, res) => {
+/* ========= 画面返却 ========= */
+
+// /api 以外は index.html を返す
+app.get("*", (req, res) => {
   res.sendFile(FRONTEND_HTML);
 });
 
