@@ -18,9 +18,11 @@ services:
     build:
       context: .
       dockerfile: php/Dockerfile
-    command: php -S 0.0.0.0:8000 -t /app/php /app/php/index.php
     ports:
-      - "8001:8000"
+      - "${PHP_PORT:-8001}:8000"
     volumes:
       - ./php:/app/php
       - ./shared:/app/shared
+    environment:
+      - PHP_HOST_PORT=${PHP_PORT:-8001}
+      - PHP_HOST_ADDR=${PHP_HOST_ADDR:-127.0.0.1}
