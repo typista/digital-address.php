@@ -7,9 +7,15 @@ SHARED_FRONTEND="$PROJECT_ROOT/shared/frontend"
 VENV_DIR="$SCRIPT_DIR/.venv"
 
 DEFAULT_PORT=8000
-HOST="${HOST:-127.0.0.1}"
+# BIND_HOST を変更したい場合は HOST_OVERRIDE もしくは DEV_SERVER_HOST を指定してください。
+DEFAULT_HOST="127.0.0.1"
+BIND_HOST="${HOST_OVERRIDE:-${DEV_SERVER_HOST:-}}"
+if [[ -z "$BIND_HOST" ]]; then
+  BIND_HOST="$DEFAULT_HOST"
+fi
+
 PORT="${1:-${PORT:-$DEFAULT_PORT}}"
-BASE_URL="http://${HOST}:${PORT}"
+BASE_URL="http://${BIND_HOST}:${PORT}"
 INDEX_URL="${BASE_URL}/index.html"
 API_URL="${BASE_URL}/api?search_code=1000001"
 
