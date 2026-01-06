@@ -6,15 +6,9 @@ PROJECT_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 SHARED_FRONTEND="$PROJECT_ROOT/shared/frontend"
 
 DEFAULT_PORT=8000
-# BIND_HOST を変更したい場合は HOST_OVERRIDE もしくは DEV_SERVER_HOST を指定してください。
-DEFAULT_HOST="127.0.0.1"
-BIND_HOST="${HOST_OVERRIDE:-${DEV_SERVER_HOST:-}}"
-if [[ -z "$BIND_HOST" ]]; then
-  BIND_HOST="$DEFAULT_HOST"
-fi
-
+HOST="127.0.0.1"
 PORT="${1:-${PORT:-$DEFAULT_PORT}}"
-BASE_URL="http://${BIND_HOST}:${PORT}"
+BASE_URL="http://${HOST}:${PORT}"
 INDEX_URL="${BASE_URL}/index.html"
 API_URL="${BASE_URL}/api?search_code=1000001"
 
@@ -41,7 +35,7 @@ prepare_environment() {
 }
 
 start_server() {
-  php -S "${BIND_HOST}:${PORT}" -t "$SCRIPT_DIR" "$SCRIPT_DIR/index.php" &
+  php -S "${HOST}:${PORT}" -t "$SCRIPT_DIR" "$SCRIPT_DIR/index.php" &
   SERVER_PID=$!
 }
 
