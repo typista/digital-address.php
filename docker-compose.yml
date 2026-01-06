@@ -12,7 +12,11 @@ services:
       - ./node:/app/node
       - ./shared:/app/shared
     environment:
-      - NODE_ENV=development
+      NODE_ENV: development
+      BIND_HOST: 0.0.0.0
+      PUBLIC_HOST: 127.0.0.1
+      PUBLIC_PORT: 8000
+      PORT: 8000
 
   php:
     build:
@@ -23,6 +27,11 @@ services:
     volumes:
       - ./php:/app/php
       - ./shared:/app/shared
+    environment:
+      BIND_HOST: 0.0.0.0
+      PUBLIC_HOST: 127.0.0.1
+      PUBLIC_PORT: 8001
+      PORT: 8000
 
   ruby:
     build:
@@ -37,6 +46,8 @@ services:
     environment:
       HOST: 0.0.0.0
       BIND_HOST: 0.0.0.0
+      PUBLIC_HOST: 127.0.0.1
+      PUBLIC_PORT: 8002
       PORT: 8002
 
   python:
@@ -52,4 +63,6 @@ services:
     environment:
       HOST: 0.0.0.0
       BIND_HOST: 0.0.0.0
+      PUBLIC_HOST: 127.0.0.1
+      PUBLIC_PORT: 8003
       PORT: 8003

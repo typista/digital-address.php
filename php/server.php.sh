@@ -6,9 +6,14 @@ PROJECT_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 SHARED_FRONTEND="$PROJECT_ROOT/shared/frontend"
 
 DEFAULT_PORT=8000
-HOST="127.0.0.1"
+DEFAULT_BIND_HOST="127.0.0.1"
+DEFAULT_PUBLIC_HOST="127.0.0.1"
+
+BIND_HOST="${BIND_HOST:-$DEFAULT_BIND_HOST}"
 PORT="${1:-${PORT:-$DEFAULT_PORT}}"
-BASE_URL="http://${HOST}:${PORT}"
+PUBLIC_HOST="${PUBLIC_HOST:-$DEFAULT_PUBLIC_HOST}"
+PUBLIC_PORT="${PUBLIC_PORT:-$PORT}"
+BASE_URL="http://${PUBLIC_HOST}:${PUBLIC_PORT}"
 INDEX_URL="${BASE_URL}/index.html"
 API_URL="${BASE_URL}/api?search_code=1000001"
 
@@ -35,7 +40,7 @@ prepare_environment() {
 }
 
 start_server() {
-  php -S "${HOST}:${PORT}" -t "$SCRIPT_DIR" "$SCRIPT_DIR/index.php" &
+  php -S "${BIND_HOST}:${PORT}" -t "$SCRIPT_DIR" "$SCRIPT_DIR/index.php" &
   SERVER_PID=$!
 }
 

@@ -17,7 +17,7 @@ require "cgi"
 # - shared/runtime/access_token.json（自動生成）
 # =========================
 
-set :bind, ENV.fetch("HOST", "127.0.0.1")
+set :bind, ENV.fetch("BIND_HOST", ENV.fetch("HOST", "127.0.0.1"))
 set :port, ENV.fetch("PORT", "8002").to_i
 
 ROOT_DIR = File.expand_path("..", __dir__)
