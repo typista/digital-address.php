@@ -23,16 +23,15 @@ const RUNTIME_DIR = path.join(SHARED_DIR, "runtime");
 const CREDENTIALS_FILE = path.join(CONFIG_DIR, "credentials.json");
 const TOKEN_FILE = path.join(RUNTIME_DIR, "access_token.json");
 
-const app = express();
 const HOST = process.env.HOST ?? "0.0.0.0";
 const PORT = Number(process.env.PORT ?? 8000);
 
+const app = express();
+
 /* ========= ミドルウェア ========= */
 
-// 静的ファイル（shared/frontend）を配信
 app.use(express.static(FRONTEND_DIR));
 
-// CORS（API用）
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "*");
@@ -40,7 +39,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// GET以外は 204（元処理と同等）
 app.use((req, res, next) => {
   if (req.method !== "GET") {
     res.status(204).end();
@@ -49,96 +47,164 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ========= API処理 ========= */
+/* ========= ルーティング ========= */
 
-app.get("/api", async (req, res) => {
-  const searchCode = req.query.search_code ?? "";
-
-  // Token確保（キャッシュ→なければ取得）
-  let token = null;
-  if (fs.existsSync(TOKEN_FILE)) {
-    // キャッシュがあれば利用
-    try {
-      const obj = JSON.parse(fs.readFileSync(TOKEN_FILE, "utf8"));
-      const mtimeSec = Math.floor(fs.statSync(TOKEN_FILE).mtimeMs / 1000);
-      if (Math.floor(Date.now() / 1000) < mtimeSec + obj.expires_in) {
-        token = obj.token;
-      }
-    } catch {
-      token = null;
-    }
-  }
-
-  if (!token) {
-    if (!fs.existsSync(CREDENTIALS_FILE)) {
-      res.status(500).json({ error: "credentials.json not found" });
-      return;
-    }
-
-    const credentials = fs.readFileSync(CREDENTIALS_FILE, "utf8");
-    const tokenResp = await fetch("https://api.da.pf.japanpost.jp/api/v1/j/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-forwarded-for": "127.0.0.1"
-      },
-      body: credentials
-    });
-
-    const bodyText = await tokenResp.text();
-    if (tokenResp.status !== 200) {
-      res.status(tokenResp.status).type("application/json").send(bodyText);
-      return;
-    }
-
-    fs.mkdirSync(RUNTIME_DIR, { recursive: true });
-    fs.writeFileSync(TOKEN_FILE, bodyText, "utf8");
-    token = JSON.parse(bodyText).token;
-  }
-
-  res.type("application/json");
-
-  // 元コードの正規表現を関数化して判定
-  const isZipOrCode = /^(\d{3,7})$/.test(searchCode) || /^(\w{7})$/.test(searchCode);
-
-  try {
-    if (isZipOrCode) {
-      // GET /searchcode/{search_code}
-      const apiResp = await fetch(
-        `https://api.da.pf.japanpost.jp/api/v1/searchcode/${encodeURIComponent(searchCode)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const body = await apiResp.text();
-      res.status(apiResp.status).send(body);
-      return;
-    }
-
-    // POST /addresszip
-    const apiResp = await fetch("https://api.da.pf.japanpost.jp/api/v1/addresszip", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ freeword: searchCode })
-    });
-    const body = await apiResp.text();
-    res.status(apiResp.status).send(body);
-  } catch (error) {
-    res.status(500).json({ error: "internal_error", message: String(error) });
-  }
-});
-
-/* ========= 画面返却 ========= */
-
-// /api 以外は index.html を返す
-app.get("*", (req, res) => {
-  res.sendFile(FRONTEND_HTML);
-});
+app.get("/api", handleApiRequest);
+app.get("/api/*", handleApiRequest);
+app.get("*", serveIndexHtml);
 
 app.listen(PORT, HOST, () => {
   const displayHost = HOST === "0.0.0.0" ? "127.0.0.1" : HOST;
   console.log(`HTML: http://${displayHost}:${PORT}/index.html`);
   console.log(`API : http://${displayHost}:${PORT}/api?search_code=1020082`);
 });
+
+/* ========= 画面返却 ========= */
+
+function serveIndexHtml(_req, res) {
+  res.sendFile(FRONTEND_HTML);
+}
+
+/* ========= API処理 ========= */
+
+async function handleApiRequest(req, res) {
+  res.type("application/json");
+
+  const searchCode = getSearchCode(req);
+
+  try {
+    const tokenResult = await getAccessTokenOrFetch();
+    if (!tokenResult.ok) {
+      res
+        .status(tokenResult.status)
+        .type("application/json")
+        .send(tokenResult.body);
+      return;
+    }
+
+    await proxyJapanPostApi(res, tokenResult.token, searchCode);
+  } catch (error) {
+    res.status(500).json({ error: "internal_error", message: String(error) });
+  }
+}
+
+function getSearchCode(req) {
+  if (typeof req.query.search_code === "string") {
+    return req.query.search_code;
+  }
+
+  const remainder = typeof req.params?.[0] === "string" ? req.params[0] : "";
+  return remainder.length > 0 ? decodeURIComponent(remainder.replace(/^\/?/, "")) : "";
+}
+
+async function getAccessTokenOrFetch() {
+  const cached = loadCachedToken();
+  if (cached !== null) {
+    return { ok: true, token: cached };
+  }
+
+  const fetched = await fetchNewToken();
+  if (!fetched.ok) {
+    return fetched;
+  }
+
+  ensureRuntimeDir();
+  fs.writeFileSync(TOKEN_FILE, fetched.body, "utf8");
+
+  try {
+    const token = JSON.parse(fetched.body).token;
+    return { ok: true, token };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 500,
+      body: JSON.stringify({ error: "invalid_token_response", message: String(error) })
+    };
+  }
+}
+
+function loadCachedToken() {
+  if (!fs.existsSync(TOKEN_FILE)) {
+    return null;
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(TOKEN_FILE, "utf8"));
+    if (
+      typeof data.token !== "string" ||
+      typeof data.expires_in !== "number" ||
+      !Number.isFinite(data.expires_in)
+    ) {
+      return null;
+    }
+
+    const expiresAt =
+      Math.floor(fs.statSync(TOKEN_FILE).mtimeMs / 1000) + data.expires_in;
+    if (Math.floor(Date.now() / 1000) < expiresAt) {
+      return data.token;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function fetchNewToken() {
+  if (!fs.existsSync(CREDENTIALS_FILE)) {
+    return {
+      ok: false,
+      status: 500,
+      body: JSON.stringify({ error: "credentials.json not found" })
+    };
+  }
+
+  const credentials = fs.readFileSync(CREDENTIALS_FILE, "utf8");
+  const response = await fetch("https://api.da.pf.japanpost.jp/api/v1/j/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-forwarded-for": "127.0.0.1"
+    },
+    body: credentials
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    return { ok: false, status: response.status, body };
+  }
+
+  return { ok: true, status: response.status, body };
+}
+
+async function proxyJapanPostApi(res, token, searchCode) {
+  if (isZipOrCode(searchCode)) {
+    const apiResp = await fetch(
+      `https://api.da.pf.japanpost.jp/api/v1/searchcode/${encodeURIComponent(searchCode)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const body = await apiResp.text();
+    res.status(apiResp.status).type("application/json").send(body);
+    return;
+  }
+
+  const apiResp = await fetch("https://api.da.pf.japanpost.jp/api/v1/addresszip", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ freeword: searchCode })
+  });
+  const body = await apiResp.text();
+  res.status(apiResp.status).type("application/json").send(body);
+}
+
+function isZipOrCode(value) {
+  return /^\d{3,7}$/.test(value) || /^\w{7}$/.test(value);
+}
+
+function ensureRuntimeDir() {
+  fs.mkdirSync(RUNTIME_DIR, { recursive: true });
+}
 

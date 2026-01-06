@@ -19,21 +19,20 @@ define('RUNTIME_DIR', SHARED_DIR . '/runtime');
 define('TOKEN_FILE', RUNTIME_DIR . '/access_token.json');
 define('CREDENTIALS_FILE', CONFIG_DIR . '/credentials.json');
 
-/* ========= ルーティング（/api 判定） ========= */
+/* ========= ルーティング ========= */
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-if ($path === '/api') {
-    handle_api_request();
+if ($path === '/api' || str_starts_with($path ?? '', '/api/')) {
+    handleApiRequest();
     exit;
 }
 
-// /api 以外は index.html を返す
-serve_index_html();
+serveIndexHtml();
 exit;
 
 
 /* ========= 画面返却 ========= */
-function serve_index_html(): void
+function serveIndexHtml(): void
 {
     header('Content-Type: text/html; charset=utf-8');
 
@@ -48,7 +47,7 @@ function serve_index_html(): void
 
 
 /* ========= API処理 ========= */
-function handle_api_request(): void
+function handleApiRequest(): void
 {
     // CORS（API用）
     header('Access-Control-Allow-Origin: *');
@@ -62,63 +61,85 @@ function handle_api_request(): void
     }
 
     // search_code の取得（元処理を踏襲）
-    $search_code = get_search_code();
+    $search_code = getSearchCode();
 
     // Token確保（キャッシュ→なければ取得）
-    $token = get_access_token_or_fetch();
+    $token_result = getAccessTokenOrFetch();
+    if ($token_result['ok'] === false) {
+        http_response_code($token_result['status']);
+        header('Content-Type: application/json');
+        echo $token_result['body'];
+        exit;
+    }
 
     // Japan Post APIへリクエストして、そのまま返却
-    proxy_japanpost_api($token, $search_code);
+    proxyJapanPostApi($token_result['token'], $search_code);
 }
 
 
 /* ========= search_code 取得 ========= */
-function get_search_code(): string
+function getSearchCode(): string
 {
     // クエリ優先
     if (isset($_GET['search_code'])) {
         return (string)$_GET['search_code'];
     }
 
-    // クエリが無い場合はパスの末尾（元処理踏襲）
-    $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-    $fallback = rawurldecode(ltrim($path ?? '', '/'));
-    return (string)$fallback;
+    // クエリが無い場合は /api/{code} の末尾を利用
+    $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?? '';
+    if (str_starts_with($path, '/api/')) {
+        $fallback = substr($path, strlen('/api/'));
+        return (string)rawurldecode($fallback);
+    }
+
+    return '';
 }
 
 
 /* ========= アクセストークン取得 ========= */
-function get_access_token_or_fetch(): string
+function getAccessTokenOrFetch(): array
 {
     // キャッシュがあれば利用
-    $cached = load_cached_token(TOKEN_FILE);
+    $cached = loadCachedToken(TOKEN_FILE);
     if ($cached !== null) {
-        return $cached;
+        return [
+            'ok'    => true,
+            'token' => $cached,
+        ];
     }
 
     // 無ければ取得
-    $result = fetch_new_token();
-    if ($result['status'] !== 200) {
-        http_response_code($result['status']);
-        header('Content-Type: application/json');
-        echo $result['body'];
-        exit;
+    $result = fetchNewToken();
+    if ($result['ok'] === false) {
+        return $result;
     }
 
     // runtime ディレクトリが無い場合は作成
-    if (!is_dir(RUNTIME_DIR)) {
-        mkdir(RUNTIME_DIR, 0775, true);
-    }
+    ensureRuntimeDir();
 
     // 保存して返す
     file_put_contents(TOKEN_FILE, $result['body']);
     $obj = json_decode($result['body']);
-    return $obj->token;
+    if (!$obj || !isset($obj->token)) {
+        return [
+            'ok'     => false,
+            'status' => 500,
+            'body'   => json_encode(
+                ['error' => 'invalid_token_response', 'message' => 'token missing'],
+                JSON_UNESCAPED_UNICODE
+            ),
+        ];
+    }
+
+    return [
+        'ok'    => true,
+        'token' => (string)$obj->token,
+    ];
 }
 
 
 /* ========= トークンキャッシュ読み込み ========= */
-function load_cached_token(string $token_filename): ?string
+function loadCachedToken(string $token_filename): ?string
 {
     if (!file_exists($token_filename)) {
         return null;
@@ -145,10 +166,11 @@ function load_cached_token(string $token_filename): ?string
 
 
 /* ========= 新規トークン取得 ========= */
-function fetch_new_token(): array
+function fetchNewToken(): array
 {
     if (!file_exists(CREDENTIALS_FILE)) {
         return [
+            'ok'     => false,
             'status' => 500,
             'body'   => json_encode(['error' => 'credentials.json not found'], JSON_UNESCAPED_UNICODE),
         ];
@@ -168,6 +190,7 @@ function fetch_new_token(): array
     curl_close($ch);
 
     return [
+        'ok'     => (int)$code === 200,
         'status' => (int)$code,
         'body'   => $body === false ? '' : $body,
     ];
@@ -175,14 +198,11 @@ function fetch_new_token(): array
 
 
 /* ========= JapanPost APIへプロキシ ========= */
-function proxy_japanpost_api(string $token, string $search_code): void
+function proxyJapanPostApi(string $token, string $search_code): void
 {
     header('Content-Type: application/json');
 
-    // 元コードの正規表現を関数化して判定
-    $is_zip_or_code = is_zip_or_code($search_code);
-
-    if ($is_zip_or_code) {
+    if (isZipOrCode($search_code)) {
         // GET /searchcode/{search_code}
         $url = "https://api.da.pf.japanpost.jp/api/v1/searchcode/" . rawurlencode($search_code);
 
@@ -220,21 +240,18 @@ function proxy_japanpost_api(string $token, string $search_code): void
 
 
 /* ========= search_code 種別判定 ========= */
-function is_zip_or_code(string $search_code): bool
+function isZipOrCode(string $search_code): bool
 {
-    /**
-     * 元コード：
-     *   preg_match('/^\d{3,7}|\w{7}$/', $search_code)
-     *
-     * これは「^ が左側だけに効く」ので意図より広くマッチし得ます。
-     * 元挙動を保つなら、そのまま。
-     */
-    return preg_match('/^\d{3,7}|\w{7}$/', $search_code) === 1;
+    return preg_match('/^\d{3,7}$/', $search_code) === 1
+        || preg_match('/^\w{7}$/', $search_code) === 1;
+}
 
-    /**
-     * もし “意図通りに厳密化” したい場合は、以下に置き換えてください：
-     *
-     * return preg_match('/^(\d{3,7}|\w{7})$/', $search_code) === 1;
-     */
+
+/* ========= 補助 ========= */
+function ensureRuntimeDir(): void
+{
+    if (!is_dir(RUNTIME_DIR)) {
+        mkdir(RUNTIME_DIR, 0775, true);
+    }
 }
 
