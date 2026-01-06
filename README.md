@@ -69,8 +69,8 @@ Japan Post 側で 127.0.0.1 を許可 IP として登録しておくとローカ
 ### 3. ローカル実行 (PHP 版)
 
 ```bash
-# 必要に応じて PHP の PATH を調整してください
 ./php/server.php.sh           # ブラウザが自動で起動します
+./php/server.php.sh 9000      # 引数または PORT=9000 でポート上書き
 
 # 手動で起動する場合（ドキュメントルート: php）
 php -S 127.0.0.1:8000 -t php php/index.php
@@ -85,19 +85,18 @@ curl "http://127.0.0.1:8000/api?search_code=1000001"
 ### 4. ローカル実行 (Node.js 版)
 
 ```bash
-cd node
-npm install
-./server.nodejs.sh        # npm start をラップしています
+./node/server.nodejs.sh       # 初回は自動で npm install を実行
+PORT=9000 ./node/server.nodejs.sh  # 環境変数または引数でポート上書き
 
-# 直接起動
-npm start   # node ディレクトリ内で実行
+# 直接起動（依存関係は別途 npm install）
+cd node && npm start
 
 # 動作確認例
 curl "http://127.0.0.1:8000/api?search_code=1000001"
 ```
 
 - 旧構成で生成されていたリポジトリ直下の `node_modules/` や `package-lock.json` は不要になったため削除し、`node/` 配下で再生成してください。
-- `node/index.js` の `PORT` は既定で 8000、`shared/frontend` を静的配信します。
+- `node/index.js` は `PORT`（既定 8000）と `HOST` を環境変数で受け取り、`shared/frontend` を静的配信します。
 - トークンキャッシュは PHP 版と同じファイル (`shared/runtime/access_token.json`) を利用します。
 
 ## Docker での開発

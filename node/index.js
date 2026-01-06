@@ -13,7 +13,8 @@ const TOKEN_FILE = path.join(RUNTIME_DIR, "access_token.json");
 const CREDENTIALS_FILE = path.join(CONFIG_DIR, "credentials.json");
 
 const app = express();
-const PORT = 8000;
+const HOST = process.env.HOST ?? "0.0.0.0";
+const PORT = Number(process.env.PORT ?? 8000);
 
 // 静的ファイル（shared/frontend）を配信
 app.use(express.static(FRONTEND_DIR));
@@ -111,8 +112,9 @@ app.get("/", (req, res) => {
   res.sendFile(FRONTEND_HTML);
 });
 
-app.listen(PORT, () => {
-  console.log(`HTML: http://127.0.0.1:${PORT}/index.html`);
-  console.log(`API : http://127.0.0.1:${PORT}/api?search_code=1020082`);
+app.listen(PORT, HOST, () => {
+  const displayHost = HOST === "0.0.0.0" ? "127.0.0.1" : HOST;
+  console.log(`HTML: http://${displayHost}:${PORT}/index.html`);
+  console.log(`API : http://${displayHost}:${PORT}/api?search_code=1020082`);
 });
 

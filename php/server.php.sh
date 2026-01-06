@@ -5,54 +5,71 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 SHARED_FRONTEND="$PROJECT_ROOT/shared/frontend"
 
-PORT=${1:-8000}
-HOST=127.0.0.1
-URL="http://$HOST:$PORT/?search_code=1000001"
-INDEX="http://$HOST:$PORT/index.html"
+DEFAULT_PORT=8000
+HOST="${HOST:-127.0.0.1}"
+PORT="${1:-${PORT:-$DEFAULT_PORT}}"
+BASE_URL="http://${HOST}:${PORT}"
+INDEX_URL="${BASE_URL}/index.html"
+API_URL="${BASE_URL}/api?search_code=1000001"
 
+SCRIPT_NAME="[server.php.sh]"
+SERVER_PID=""
+
+# Homebrew の PHP 8.4 を優先利用（必要ない場合は削除してください）
 PATH="/opt/homebrew/opt/php@8.4/bin:$PATH"
 PATH="/opt/homebrew/opt/php@8.4/sbin:$PATH"
 
-servephp() {
-  local port=${1:-8000}
-  php -S 127.0.0.1:$port -t "$SCRIPT_DIR" "$SCRIPT_DIR/index.php"
+print_start_message() {
+  echo "${SCRIPT_NAME} Starting PHP proxy on ${BASE_URL}"
+  echo "${SCRIPT_NAME} Quick check: ${API_URL}"
 }
 
-# サーバ停止処理（Ctrl+C / kill / 終了時に必ず呼ばれる）
-cleanup() {
-  echo "\n[server.php.sh] Stopping PHP server..."
-  if [[ -n "$SERVER_PID" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
-    kill "$SERVER_PID"
-    wait "$SERVER_PID" 2>/dev/null || true
-    echo "[server.php.sh] Stopped. (pid=$SERVER_PID)"
+warn_missing_frontend() {
+  if [[ ! -f "$SHARED_FRONTEND/index.html" ]]; then
+    echo "${SCRIPT_NAME} Warning: $SHARED_FRONTEND/index.html が見つかりません。"
   fi
 }
 
-# EXIT / INT(Ctrl+C) / TERM を捕捉して cleanup を実行
+prepare_environment() {
+  mkdir -p "$PROJECT_ROOT/shared/runtime"
+}
+
+start_server() {
+  php -S "${HOST}:${PORT}" -t "$SCRIPT_DIR" "$SCRIPT_DIR/index.php" &
+  SERVER_PID=$!
+}
+
+wait_for_server() {
+  sleep 0.3
+}
+
+open_browser() {
+  if command -v open >/dev/null 2>&1; then
+    echo "${SCRIPT_NAME} Opening browser..."
+    open "$INDEX_URL"
+  else
+    echo "${SCRIPT_NAME} Browser auto-open skipped (open command not found)"
+  fi
+}
+
+cleanup() {
+  printf "\n${SCRIPT_NAME} Stopping PHP server...\n"
+  if [[ -n "$SERVER_PID" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
+    kill "$SERVER_PID"
+    wait "$SERVER_PID" 2>/dev/null || true
+    echo "${SCRIPT_NAME} Stopped. (pid=$SERVER_PID)"
+  fi
+}
+
 trap cleanup EXIT INT TERM
 
-echo "[server.php.sh] Starting PHP server on $URL ..."
+print_start_message
+warn_missing_frontend
+prepare_environment
+start_server
+wait_for_server
+open_browser
 
-# 必要な共有ディレクトリの存在を案内
-if [[ ! -f "$SHARED_FRONTEND/index.html" ]]; then
-  echo "[server.php.sh] Warning: $SHARED_FRONTEND/index.html が見つかりません。"
-fi
+echo "${SCRIPT_NAME} PHP server is running (pid=$SERVER_PID). Press Ctrl+C to stop."
 
-mkdir -p "$PROJECT_ROOT/shared/runtime"
-
-# servephp はフォアグラウンドで動くので、バックグラウンドで起動
-servephp "$PORT" >/dev/null 2>&1 &
-SERVER_PID=$!
-
-# サーバが立ち上がるのを軽く待つ（早すぎるopen対策）
-sleep 0.3
-
-echo "[server.php.sh] Opening browser..."
-open "$INDEX"
-
-echo "[server.php.sh] PHP server is running (pid=$SERVER_PID)."
-echo "[server.php.sh] Press Ctrl+C to stop."
-
-# サーバが終わるまで待つ（これがあるのでスクリプトが即終了しない）
 wait "$SERVER_PID"
-
