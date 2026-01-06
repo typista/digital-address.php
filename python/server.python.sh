@@ -6,10 +6,11 @@ PROJECT_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 SHARED_FRONTEND="$PROJECT_ROOT/shared/frontend"
 VENV_DIR="$SCRIPT_DIR/.venv"
 
-DEFAULT_PORT=8000
-HOST="127.0.0.1"
+DEFAULT_PORT=8003
+# BIND_HOST を変更したい場合は BIND_HOST 環境変数を設定してください（デフォルト 127.0.0.1）
+BIND_HOST="${BIND_HOST:-127.0.0.1}"
 PORT="${1:-${PORT:-$DEFAULT_PORT}}"
-BASE_URL="http://${HOST}:${PORT}"
+BASE_URL="http://${BIND_HOST}:${PORT}"
 INDEX_URL="${BASE_URL}/index.html"
 API_URL="${BASE_URL}/api?search_code=1000001"
 
@@ -43,7 +44,7 @@ prepare_environment() {
 
 start_server() {
   source "$VENV_DIR/bin/activate"
-  HOST="$HOST" PORT="$PORT" python "$SCRIPT_DIR/index.py" &
+  HOST="$BIND_HOST" PORT="$PORT" python "$SCRIPT_DIR/index.py" &
   SERVER_PID=$!
   deactivate
 }

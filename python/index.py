@@ -30,8 +30,8 @@ RUNTIME_DIR = SHARED_DIR / "runtime"
 TOKEN_FILE = RUNTIME_DIR / "access_token.json"
 CREDENTIALS_FILE = CONFIG_DIR / "credentials.json"
 
-HOST = os.environ.get("HOST", "0.0.0.0")
-PORT = int(os.environ.get("PORT", "8000"))
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "8003"))
 
 app = Flask(__name__)
 

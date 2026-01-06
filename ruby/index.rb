@@ -18,7 +18,7 @@ require "cgi"
 # =========================
 
 set :bind, ENV.fetch("HOST", "0.0.0.0")
-set :port, ENV.fetch("PORT", "8000").to_i
+set :port, ENV.fetch("PORT", "8002").to_i
 
 ROOT_DIR = File.expand_path("..", __dir__)
 SHARED_DIR = File.join(ROOT_DIR, "shared")

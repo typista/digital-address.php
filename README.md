@@ -28,13 +28,15 @@ jp-digital-address-proxy/
 │   ├── index.js
 │   ├── package.json
 │   └── server.nodejs.sh       # npm start ラッパースクリプト
-├── ruby/                      # Ruby (Sinatra) 実装と起動スクリプト
+├── ruby/                      # Ruby (Sinatra) 実装・Docker
 │   ├── index.rb
-│   ├── Gemfile
+│   ├── Gemfile / Gemfile.lock
+│   ├── Dockerfile
 │   └── server.ruby.sh
-└── python/                    # Python (Flask) 実装と起動スクリプト
+└── python/                    # Python (Flask) 実装・Docker
     ├── index.py
     ├── requirements.txt
+    ├── Dockerfile
     └── server.python.sh
 ```
 
@@ -147,21 +149,23 @@ curl "http://127.0.0.1:8000/api?search_code=1000001"
 - `index.py` は Flask で `/api` を提供し、各言語版と同じトークン管理・ルーティングを実装しています。
 ## Docker での開発
 
-Docker と Docker Compose v2 が利用可能な環境では、コンテナ経由で PHP / Node.js の両方を起動できます。事前に `shared/config/credentials.json` を用意してから以下を実行してください。
+Docker と Docker Compose v2 が利用可能な環境では、コンテナ経由で各言語実装を起動できます。事前に `shared/config/credentials.json` を用意してから以下を実行してください。
 
 ```bash
-# PHP + Node を同時に起動
+# すべてのサービス (Node / PHP / Ruby / Python) を同時に起動
 docker compose up
 
-# どちらか片方のみ起動
+# 個別に起動
 docker compose up node
 docker compose up php
+docker compose up ruby
+docker compose up python
 ```
 
-- Node サービスは `http://127.0.0.1:8000/`、PHP サービスは `http://127.0.0.1:8001/` でアクセスできます。
+- Node サービスは `http://127.0.0.1:8000/`、PHP サービスは `http://127.0.0.1:8001/`、Ruby サービスは `http://127.0.0.1:8002/`、Python サービスは `http://127.0.0.1:8003/` でアクセスできます。
 - 共有リソース（`shared/frontend` や `shared/config` など）はボリュームとしてマウントされるため、ホスト側の変更が即座に反映されます。
 - 初回起動時は Node コンテナ内で `npm install` が走るため、準備完了まで少し時間がかかる場合があります。
-- PHP サービスは `PHP_PORT=8000 docker compose up php` のように `PHP_PORT` を指定するとホスト側ポートを上書きできます。コンテナログには実際にアクセス可能な URL が案内されます。
+- 各サービスのホスト側ポートは上記のとおり固定です。変更したい場合は `docker-compose.yml` を編集してください。
 
 ## API 挙動
 

@@ -19,10 +19,29 @@ services:
       context: .
       dockerfile: php/Dockerfile
     ports:
-      - "${PHP_PORT:-8001}:8000"
+      - "8001:8000"
     volumes:
       - ./php:/app/php
       - ./shared:/app/shared
-    environment:
-      - PHP_HOST_PORT=${PHP_PORT:-8001}
-      - PHP_HOST_ADDR=${PHP_HOST_ADDR:-127.0.0.1}
+
+  ruby:
+    build:
+      context: .
+      dockerfile: ruby/Dockerfile
+    command: bundle exec ruby index.rb
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./ruby:/app/ruby
+      - ./shared:/app/shared
+
+  python:
+    build:
+      context: .
+      dockerfile: python/Dockerfile
+    command: python index.py
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./python:/app/python
+      - ./shared:/app/shared
