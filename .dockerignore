@@ -6,5 +6,6 @@ shared/config/credentials.json
 .gitmodules
 .gitignore
 ruby/vendor/
+ruby/.bundle/
 python/.venv/
 __pycache__/

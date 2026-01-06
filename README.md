@@ -91,6 +91,7 @@ curl "http://127.0.0.1:8000/api?search_code=1000001"
 
 - PHP 組み込みサーバーが `/api` 以外のパスを `index.html` にフォールバックします。
 - `/api` では GET 以外のメソッドを 204 で返却し、CORS ヘッダーを許可しています。
+- 別ホストで待ち受けたい場合は `HOST_OVERRIDE=0.0.0.0 ./php/server.php.sh` のように `HOST_OVERRIDE`（または `DEV_SERVER_HOST`）を指定してください。
 
 ### 4. ローカル実行 (Node.js 版)
 
@@ -109,6 +110,7 @@ curl "http://127.0.0.1:8000/api?search_code=1000001"
 - `node/index.js` は `PORT`（既定 8000）と `HOST` を環境変数で受け取り、`shared/frontend` を静的配信します。
 - トークンキャッシュは PHP 版と同じファイル (`shared/runtime/access_token.json`) を利用します。
 - PHP ファイルは `.php-cs-fixer.php` のルールに従って整形できます。関数の波括弧は同じ行に配置する方針です。
+- 別ホストで待ち受けたい場合は `HOST_OVERRIDE=0.0.0.0 ./node/server.nodejs.sh` のように `HOST_OVERRIDE`（または `DEV_SERVER_HOST`）を指定してください。
 
 ### 5. ローカル実行 (Ruby 版)
 
@@ -127,6 +129,7 @@ curl "http://127.0.0.1:8000/api?search_code=1000001"
 
 - `server.ruby.sh` は `bundle install` 実行後に `bundle exec ruby index.rb` を起動します。依存ライブラリは `ruby/vendor/` にインストールされ、`.gitignore` で除外しています。
 - `index.rb` は Sinatra を利用し、PHP/Node 版と同じルーティング・トークンキャッシュの挙動を提供します。
+- 別ホストで待ち受けたい場合は `HOST_OVERRIDE=0.0.0.0 ./ruby/server.ruby.sh` のように指定してください。
 
 ### 6. ローカル実行 (Python 版)
 
@@ -148,6 +151,7 @@ curl "http://127.0.0.1:8000/api?search_code=1000001"
 
 - `server.python.sh` はローカルに `.venv/` を作成して `Flask` / `requests` をインストールします。`.venv/` は `.gitignore` / `.dockerignore` 済みです。
 - `index.py` は Flask で `/api` を提供し、各言語版と同じトークン管理・ルーティングを実装しています。
+- 別ホストで待ち受けたい場合は `HOST_OVERRIDE=0.0.0.0 ./python/server.python.sh` のように指定してください。
 
 ## Docker での開発
 

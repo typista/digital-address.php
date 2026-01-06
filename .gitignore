@@ -8,6 +8,7 @@ node_modules/
 
 # Ruby / Python environment directories
 ruby/vendor/
+ruby/.bundle/
 python/.venv/
 __pycache__/
 
