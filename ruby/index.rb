@@ -4,6 +4,8 @@ require "uri"
 require "fileutils"
 require "sinatra"
 require "cgi"
+require "webrick"
+require "logger"
 
 # =========================
 #  ruby/index.rb
@@ -19,8 +21,14 @@ require "cgi"
 
 set :bind, ENV.fetch("BIND_HOST", ENV.fetch("HOST", "127.0.0.1"))
 set :port, ENV.fetch("PORT", "8002").to_i
+set :logging, false
 
 configure do
+  set :server_settings, AccessLog: []
+  if defined?(WEBrick)
+    set :server_settings, settings.server_settings.merge(Logger: WEBrick::Log.new($stderr, WEBrick::Log::WARN))
+  end
+
   bind_host = settings.bind
   public_host = ENV.fetch("PUBLIC_HOST", bind_host == "0.0.0.0" ? "127.0.0.1" : bind_host)
   public_port = ENV.fetch("PUBLIC_PORT", settings.port.to_s)

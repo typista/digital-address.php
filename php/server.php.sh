@@ -20,6 +20,8 @@ API_URL="${ACCESS_URL}/api?search_code=1000001"
 
 SCRIPT_NAME="[server.php.sh]"
 SERVER_PID=""
+FILTER_PID=""
+LOG_PIPE=""
 
 # Homebrew の PHP 8.4 を優先利用（必要ない場合は削除してください）
 PATH="/opt/homebrew/opt/php@8.4/bin:$PATH"
@@ -42,9 +44,15 @@ prepare_environment() {
 }
 
 start_server() {
+  LOG_PIPE=$(mktemp -u "/tmp/php-server-log.XXXXXX")
+  mkfifo "$LOG_PIPE"
+
   BIND_HOST="$BIND_HOST" PUBLIC_HOST="$PUBLIC_HOST" PUBLIC_PORT="$PUBLIC_PORT" PORT="$PORT" \
-    php -S "${BIND_HOST}:${PORT}" -t "$SCRIPT_DIR" "$SCRIPT_DIR/index.php" &
+    php -S "${BIND_HOST}:${PORT}" -t "$SCRIPT_DIR" "$SCRIPT_DIR/index.php" >"$LOG_PIPE" 2>&1 &
   SERVER_PID=$!
+
+  sed -u '/ Accepted$/d; / Closing$/d' <"$LOG_PIPE" &
+  FILTER_PID=$!
 }
 
 wait_for_server() {
@@ -62,10 +70,20 @@ open_browser() {
 
 cleanup() {
   printf "\n${SCRIPT_NAME} Stopping PHP server...\n"
+
+  if [[ -n "$FILTER_PID" ]] && kill -0 "$FILTER_PID" 2>/dev/null; then
+    kill "$FILTER_PID" 2>/dev/null || true
+    wait "$FILTER_PID" 2>/dev/null || true
+  fi
+
   if [[ -n "$SERVER_PID" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
-    kill "$SERVER_PID"
+    kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
     echo "${SCRIPT_NAME} Stopped. (pid=$SERVER_PID)"
+  fi
+
+  if [[ -n "$LOG_PIPE" && -p "$LOG_PIPE" ]]; then
+    rm -f "$LOG_PIPE"
   fi
 }
 
@@ -81,3 +99,4 @@ open_browser
 echo "${SCRIPT_NAME} PHP server is running (pid=$SERVER_PID). Press Ctrl+C to stop."
 
 wait "$SERVER_PID"
+wait "$FILTER_PID" 2>/dev/null || true

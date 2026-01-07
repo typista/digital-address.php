@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import time
@@ -38,6 +39,16 @@ LISTEN_URL = f"http://{BIND_HOST}:{PORT}"
 ACCESS_URL = f"http://{PUBLIC_HOST}:{PUBLIC_PORT}"
 
 app = Flask(__name__)
+
+werkzeug_logger = logging.getLogger("werkzeug")
+werkzeug_logger.setLevel(logging.WARNING)
+for handler in list(werkzeug_logger.handlers):
+    handler.setLevel(logging.WARNING)
+werkzeug_logger.propagate = False
+
+app.logger.handlers.clear()
+app.logger.setLevel(logging.WARNING)
+app.logger.propagate = False
 
 
 # ========= ミドルウェア =========
