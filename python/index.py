@@ -34,6 +34,8 @@ BIND_HOST = os.environ.get("BIND_HOST") or os.environ.get("HOST", "127.0.0.1")
 PUBLIC_HOST = os.environ.get("PUBLIC_HOST") or "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8003"))
 PUBLIC_PORT = int(os.environ.get("PUBLIC_PORT", PORT))
+LISTEN_URL = f"http://{BIND_HOST}:{PORT}"
+ACCESS_URL = f"http://{PUBLIC_HOST}:{PUBLIC_PORT}"
 
 app = Flask(__name__)
 
@@ -43,9 +45,16 @@ app = Flask(__name__)
 @app.after_request
 def addCorsHeaders(response: Response) -> Response:
     if request.path.startswith("/api"):
-        response.headers["Access-Control-Allow-Origin"] = "*"
+        origin = request.headers.get("Origin")
+        response.headers["Access-Control-Allow-Origin"] = origin or "*"
         response.headers["Access-Control-Allow-Methods"] = "*"
         response.headers["Access-Control-Allow-Headers"] = "*"
+    full_path = request.full_path if request.query_string else request.path
+    if full_path.endswith("?"):
+        full_path = full_path[:-1]
+    print(
+        f"[python-proxy] {request.method} {ACCESS_URL}{full_path or '/'} -> {response.status_code}",
+    )
     return response
 
 
@@ -208,9 +217,7 @@ def ensureRuntimeDir() -> None:
 
 
 if __name__ == "__main__":
-    listen_url = f"http://{BIND_HOST}:{PORT}"
-    public_url = f"http://{PUBLIC_HOST}:{PUBLIC_PORT}"
-    print(f"[python-proxy] Listening inside container on {listen_url}")
-    print(f"[python-proxy] Access from host via {public_url}/")
-    print(f"[python-proxy] Quick check: {public_url}/api?search_code=1000001")
+    print(f"[python-proxy] Listening inside container on {LISTEN_URL}")
+    print(f"[python-proxy] Access from host via {ACCESS_URL}/")
+    print(f"[python-proxy] Quick check: {ACCESS_URL}/api?search_code=1000001")
     app.run(host=BIND_HOST, port=PORT, debug=False)

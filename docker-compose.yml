@@ -11,10 +11,10 @@ services:
       - ./shared:/app/shared
     environment:
       NODE_ENV: development
-      BIND_HOST: 0.0.0.0
-      PUBLIC_HOST: 127.0.0.1
-      PUBLIC_PORT: 8000
-      PORT: 8000
+      BIND_HOST: "0.0.0.0"
+      PUBLIC_HOST: "127.0.0.1"
+      PUBLIC_PORT: "8000"
+      PORT: "8000"
 
   php:
     build:
@@ -26,10 +26,10 @@ services:
       - ./php:/app/php
       - ./shared:/app/shared
     environment:
-      BIND_HOST: 0.0.0.0
-      PUBLIC_HOST: 127.0.0.1
-      PUBLIC_PORT: 8001
-      PORT: 8000
+      BIND_HOST: "0.0.0.0"
+      PUBLIC_HOST: "127.0.0.1"
+      PUBLIC_PORT: "8001"
+      PORT: "8000"
 
   ruby:
     build:
@@ -42,11 +42,11 @@ services:
       - ./ruby:/app/ruby
       - ./shared:/app/shared
     environment:
-      HOST: 0.0.0.0
-      BIND_HOST: 0.0.0.0
-      PUBLIC_HOST: 127.0.0.1
-      PUBLIC_PORT: 8002
-      PORT: 8002
+      HOST: "0.0.0.0"
+      BIND_HOST: "0.0.0.0"
+      PUBLIC_HOST: "127.0.0.1"
+      PUBLIC_PORT: "8002"
+      PORT: "8002"
 
   python:
     build:
@@ -59,8 +59,8 @@ services:
       - ./python:/app/python
       - ./shared:/app/shared
     environment:
-      HOST: 0.0.0.0
-      BIND_HOST: 0.0.0.0
-      PUBLIC_HOST: 127.0.0.1
-      PUBLIC_PORT: 8003
-      PORT: 8003
+      HOST: "0.0.0.0"
+      BIND_HOST: "0.0.0.0"
+      PUBLIC_HOST: "127.0.0.1"
+      PUBLIC_PORT: "8003"
+      PORT: "8003"

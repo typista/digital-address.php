@@ -1,12 +1,17 @@
 #!/bin/sh
 set -eu
 
-# Host側で公開されるポート。未設定なら 8000 を表示（php/ ディレクトリの compose 用）。
-HOST_PORT="${PHP_HOST_PORT:-8000}"
-HOST_ADDR="${PHP_HOST_ADDR:-127.0.0.1}"
-PUBLIC_URL="http://${HOST_ADDR}:${HOST_PORT}"
+# バインド先とホスト側アクセス用URL
+BIND_HOST="${BIND_HOST:-0.0.0.0}"
+PORT="${PORT:-8000}"
+PUBLIC_HOST="${PUBLIC_HOST:-127.0.0.1}"
+PUBLIC_PORT="${PUBLIC_PORT:-$PORT}"
 
-echo "[php-proxy] Listening inside container on 0.0.0.0:8000"
-echo "[php-proxy] Access from host via ${PUBLIC_URL}/"
+LISTEN_URL="http://${BIND_HOST}:${PORT}"
+ACCESS_URL="http://${PUBLIC_HOST}:${PUBLIC_PORT}"
 
-exec php -S 0.0.0.0:8000 -t /app/php /app/php/index.php
+echo "[php-proxy] Listening inside container on ${LISTEN_URL}"
+echo "[php-proxy] Access from host via ${ACCESS_URL}/"
+echo "[php-proxy] Quick check: ${ACCESS_URL}/api?search_code=1000001"
+
+exec php -S "${BIND_HOST}:${PORT}" -t /app/php /app/php/index.php

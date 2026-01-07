@@ -30,6 +30,7 @@ configure do
   puts "[ruby-proxy] Listening inside container on #{listen_url}"
   puts "[ruby-proxy] Access from host via #{access_url}/"
   puts "[ruby-proxy] Quick check: #{access_url}/api?search_code=1000001"
+  set :access_url, access_url
 end
 
 ROOT_DIR = File.expand_path("..", __dir__)
@@ -43,6 +44,20 @@ CREDENTIALS_FILE = File.join(CONFIG_DIR, "credentials.json")
 
 set :public_folder, FRONTEND_DIR
 set :static, true
+
+after do
+  base = if settings.respond_to?(:access_url)
+           settings.access_url
+         else
+           "http://#{request.host_with_port}"
+         end
+  path = request.fullpath || "/"
+  path = "/" if path.empty?
+  path = path.chop if path.end_with?("?")
+  path = "/" if path.nil? || path.empty?
+  status_code = response.status
+  puts "[ruby-proxy] #{request.request_method} #{base}#{path} -> #{status_code}"
+end
 
 # ========= ミドルウェア =========
 

@@ -38,18 +38,18 @@ const app = express();
 app.use(express.static(FRONTEND_DIR));
 
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "*");
-  res.setHeader("Access-Control-Allow-Headers", "*");
-  next();
-});
-
-app.use((req, res, next) => {
-  if (req.method !== "GET") {
-    res.status(204).end();
-    return;
-  }
-  next();
+    const path = req.originalUrl || req.url || "/";
+    res.on("finish", () => {
+        console.log(`[node-proxy] ${req.method} ${path} -> ${res.statusCode}`);
+    });
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "*");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    if (req.method !== "GET") {
+        res.status(204).end();
+        return;
+    }
+    next();
 });
 
 /* ========= ルーティング ========= */
