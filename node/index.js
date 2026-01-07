@@ -23,8 +23,13 @@ const RUNTIME_DIR = path.join(SHARED_DIR, "runtime");
 const CREDENTIALS_FILE = path.join(CONFIG_DIR, "credentials.json");
 const TOKEN_FILE = path.join(RUNTIME_DIR, "access_token.json");
 
-const HOST = process.env.HOST ?? "0.0.0.0";
+const BIND_HOST = process.env.BIND_HOST ?? process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 8000);
+const PUBLIC_HOST =
+  process.env.PUBLIC_HOST ?? (BIND_HOST === "0.0.0.0" ? "127.0.0.1" : BIND_HOST);
+const PUBLIC_PORT = Number(process.env.PUBLIC_PORT ?? PORT);
+const LISTEN_URL = `http://${BIND_HOST}:${PORT}`;
+const ACCESS_URL = `http://${PUBLIC_HOST}:${PUBLIC_PORT}`;
 
 const app = express();
 
@@ -53,10 +58,12 @@ app.get("/api", handleApiRequest);
 app.get("/api/*", handleApiRequest);
 app.get("*", serveIndexHtml);
 
-app.listen(PORT, HOST, () => {
-  const displayHost = HOST === "0.0.0.0" ? "127.0.0.1" : HOST;
-  console.log(`HTML: http://${displayHost}:${PORT}/index.html`);
-  console.log(`API : http://${displayHost}:${PORT}/api?search_code=1020082`);
+app.listen(PORT, BIND_HOST, () => {
+  console.log(`[node-proxy] Listening inside container on ${LISTEN_URL}`);
+  console.log(`[node-proxy] Access from host via ${ACCESS_URL}/`);
+  console.log(
+    `[node-proxy] Quick check: ${ACCESS_URL}/api?search_code=1020082`,
+  );
 });
 
 /* ========= 画面返却 ========= */

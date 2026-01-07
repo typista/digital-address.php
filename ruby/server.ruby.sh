@@ -6,18 +6,23 @@ PROJECT_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 SHARED_FRONTEND="$PROJECT_ROOT/shared/frontend"
 
 DEFAULT_PORT=8002
-DEFAULT_HOST="127.0.0.1"
-BIND_HOST="${BIND_HOST:-$DEFAULT_HOST}"
+DEFAULT_BIND_HOST="127.0.0.1"
+DEFAULT_PUBLIC_HOST="127.0.0.1"
+BIND_HOST="${BIND_HOST:-$DEFAULT_BIND_HOST}"
 PORT="${1:-${PORT:-$DEFAULT_PORT}}"
-BASE_URL="http://${BIND_HOST}:${PORT}"
-INDEX_URL="${BASE_URL}/index.html"
-API_URL="${BASE_URL}/api?search_code=1000001"
+PUBLIC_HOST="${PUBLIC_HOST:-$DEFAULT_PUBLIC_HOST}"
+PUBLIC_PORT="${PUBLIC_PORT:-$PORT}"
+LISTEN_URL="http://${BIND_HOST}:${PORT}"
+ACCESS_URL="http://${PUBLIC_HOST}:${PUBLIC_PORT}"
+INDEX_URL="${ACCESS_URL}/index.html"
+API_URL="${ACCESS_URL}/api?search_code=1000001"
 
 SCRIPT_NAME="[server.ruby.sh]"
 SERVER_PID=""
 
 print_start_message() {
-  echo "${SCRIPT_NAME} Starting Ruby proxy on ${BASE_URL}"
+  echo "${SCRIPT_NAME} Listening inside container on ${LISTEN_URL}"
+  echo "${SCRIPT_NAME} Access from host via ${ACCESS_URL}/"
   echo "${SCRIPT_NAME} Quick check: ${API_URL}"
 }
 
@@ -45,7 +50,7 @@ start_server() {
   local previous_dir
   previous_dir=$(pwd)
   cd "$SCRIPT_DIR"
-  HOST="$BIND_HOST" PORT="$PORT" bundle exec ruby index.rb &
+  HOST="$BIND_HOST" PORT="$PORT" PUBLIC_HOST="$PUBLIC_HOST" PUBLIC_PORT="$PUBLIC_PORT" bundle exec ruby index.rb &
   SERVER_PID=$!
   cd "$previous_dir"
 }

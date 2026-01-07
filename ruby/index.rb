@@ -20,6 +20,18 @@ require "cgi"
 set :bind, ENV.fetch("BIND_HOST", ENV.fetch("HOST", "127.0.0.1"))
 set :port, ENV.fetch("PORT", "8002").to_i
 
+configure do
+  bind_host = settings.bind
+  public_host = ENV.fetch("PUBLIC_HOST", bind_host == "0.0.0.0" ? "127.0.0.1" : bind_host)
+  public_port = ENV.fetch("PUBLIC_PORT", settings.port.to_s)
+
+  listen_url = "http://#{bind_host}:#{settings.port}"
+  access_url = "http://#{public_host}:#{public_port}"
+  puts "[ruby-proxy] Listening inside container on #{listen_url}"
+  puts "[ruby-proxy] Access from host via #{access_url}/"
+  puts "[ruby-proxy] Quick check: #{access_url}/api?search_code=1000001"
+end
+
 ROOT_DIR = File.expand_path("..", __dir__)
 SHARED_DIR = File.join(ROOT_DIR, "shared")
 FRONTEND_DIR = File.join(SHARED_DIR, "frontend")

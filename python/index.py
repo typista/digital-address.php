@@ -30,8 +30,8 @@ RUNTIME_DIR = SHARED_DIR / "runtime"
 TOKEN_FILE = RUNTIME_DIR / "access_token.json"
 CREDENTIALS_FILE = CONFIG_DIR / "credentials.json"
 
-BIND_HOST = os.environ.get("BIND_HOST", os.environ.get("HOST", "127.0.0.1"))
-PUBLIC_HOST = os.environ.get("PUBLIC_HOST", "127.0.0.1")
+BIND_HOST = os.environ.get("BIND_HOST") or os.environ.get("HOST", "127.0.0.1")
+PUBLIC_HOST = os.environ.get("PUBLIC_HOST") or "127.0.0.1"
 PORT = int(os.environ.get("PORT", "8003"))
 PUBLIC_PORT = int(os.environ.get("PUBLIC_PORT", PORT))
 
@@ -208,4 +208,9 @@ def ensureRuntimeDir() -> None:
 
 
 if __name__ == "__main__":
-    app.run(host=HOST, port=PORT, debug=False)
+    listen_url = f"http://{BIND_HOST}:{PORT}"
+    public_url = f"http://{PUBLIC_HOST}:{PUBLIC_PORT}"
+    print(f"[python-proxy] Listening inside container on {listen_url}")
+    print(f"[python-proxy] Access from host via {public_url}/")
+    print(f"[python-proxy] Quick check: {public_url}/api?search_code=1000001")
+    app.run(host=BIND_HOST, port=PORT, debug=False)

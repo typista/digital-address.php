@@ -13,9 +13,10 @@ BIND_HOST="${BIND_HOST:-$DEFAULT_BIND_HOST}"
 PORT="${1:-${PORT:-$DEFAULT_PORT}}"
 PUBLIC_HOST="${PUBLIC_HOST:-$DEFAULT_PUBLIC_HOST}"
 PUBLIC_PORT="${PUBLIC_PORT:-$PORT}"
-BASE_URL="http://${PUBLIC_HOST}:${PUBLIC_PORT}"
-INDEX_URL="${BASE_URL}/index.html"
-API_URL="${BASE_URL}/api?search_code=1000001"
+LISTEN_URL="http://${BIND_HOST}:${PORT}"
+ACCESS_URL="http://${PUBLIC_HOST}:${PUBLIC_PORT}"
+INDEX_URL="${ACCESS_URL}/index.html"
+API_URL="${ACCESS_URL}/api?search_code=1000001"
 
 SCRIPT_NAME="[server.php.sh]"
 SERVER_PID=""
@@ -25,7 +26,8 @@ PATH="/opt/homebrew/opt/php@8.4/bin:$PATH"
 PATH="/opt/homebrew/opt/php@8.4/sbin:$PATH"
 
 print_start_message() {
-  echo "${SCRIPT_NAME} Starting PHP proxy on ${BASE_URL}"
+  echo "${SCRIPT_NAME} Listening inside container on ${LISTEN_URL}"
+  echo "${SCRIPT_NAME} Access from host via ${ACCESS_URL}/"
   echo "${SCRIPT_NAME} Quick check: ${API_URL}"
 }
 
