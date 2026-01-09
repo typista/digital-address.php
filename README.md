@@ -61,6 +61,8 @@ jp-digital-address-proxy/
 
 ## セットアップ
 
+> **💡 Docker を使う場合**: すぐに試したい方は「[Docker での開発](#docker-での開発)」セクションを参照してください。`shared/config/credentials.json` を配置後、`docker compose up` だけで全サービスが起動します。
+
 ### 1. 資格情報ファイルの準備
 
 `shared/config/credentials.json` を作成します。公開ディレクトリに配置しないことを推奨します。  
@@ -93,6 +95,8 @@ curl "http://127.0.0.1:8000/api?search_code=1000001"
 
 - PHP 組み込みサーバーが `/api` 以外のパスを `index.html` にフォールバックします。
 - `/api` では GET 以外のメソッドを 204 で返却し、CORS ヘッダーを許可しています。
+- リクエストログは `[php-proxy] METHOD URL -> STATUS` 形式で標準エラーに出力されます。
+- PHP ファイルは `.php-cs-fixer.php` のルールに従って整形できます。関数の波括弧は同じ行に配置する方針です。
 ### 4. ローカル実行 (Node.js 版)
 
 ```bash
@@ -109,7 +113,7 @@ curl "http://127.0.0.1:8000/api?search_code=1000001"
 - 旧構成で生成されていたリポジトリ直下の `node_modules/` や `package-lock.json` は不要になったため削除し、`node/` 配下で再生成してください。
 - `node/index.js` は `PORT`（既定 8000）と `HOST` を環境変数で受け取り、`shared/frontend` を静的配信します。
 - トークンキャッシュは PHP 版と同じファイル (`shared/runtime/access_token.json`) を利用します。
-- PHP ファイルは `.php-cs-fixer.php` のルールに従って整形できます。関数の波括弧は同じ行に配置する方針です。
+- リクエストログは `[node-proxy] METHOD URL -> STATUS` 形式でコンソールに出力されます。
 ### 5. ローカル実行 (Ruby 版)
 
 ```bash
@@ -127,6 +131,7 @@ curl "http://127.0.0.1:8002/api?search_code=1000001"
 
 - `server.ruby.sh` は `bundle install` 実行後に `bundle exec ruby index.rb` を起動します。依存ライブラリは `ruby/vendor/` にインストールされ、`.gitignore` で除外しています。
 - `index.rb` は Sinatra を利用し、PHP/Node 版と同じルーティング・トークンキャッシュの挙動を提供します。
+- リクエストログは `[ruby-proxy] METHOD URL -> STATUS` 形式でコンソールに出力されます。
 ### 6. ローカル実行 (Python 版)
 
 ```bash
@@ -147,6 +152,7 @@ curl "http://127.0.0.1:8003/api?search_code=1000001"
 
 - `server.python.sh` はローカルに `.venv/` を作成して `Flask` / `requests` をインストールします。`.venv/` は `.gitignore` / `.dockerignore` 済みです。
 - `index.py` は Flask で `/api` を提供し、各言語版と同じトークン管理・ルーティングを実装しています。
+- リクエストログは `[python-proxy] METHOD URL -> STATUS` 形式でコンソールに出力されます。
 ## Docker での開発
 
 Docker と Docker Compose v2 が利用可能な環境では、コンテナ経由で各言語実装を起動できます。事前に `shared/config/credentials.json` を用意してから以下を実行してください。
@@ -160,12 +166,41 @@ docker compose up node
 docker compose up php
 docker compose up ruby
 docker compose up python
+
+# PHP イメージを再ビルドする場合（docker-entrypoint.sh 等の変更時）
+docker compose build --no-cache php
+docker compose up --force-recreate php
 ```
 
 - Node サービスは `http://127.0.0.1:8000/`、PHP サービスは `http://127.0.0.1:8001/`、Ruby サービスは `http://127.0.0.1:8002/`、Python サービスは `http://127.0.0.1:8003/` でアクセスできます。
 - 共有リソース（`shared/frontend` や `shared/config` など）はボリュームとしてマウントされるため、ホスト側の変更が即座に反映されます。
+- 各サービスのアプリケーションコード（`index.php` / `index.js` / `index.rb` / `index.py`）もボリュームマウントなので、ファイル変更後はサービスを再起動するだけで反映されます。
 - 初回起動時は Node コンテナ内で `npm install` が走るため、準備完了まで少し時間がかかる場合があります。
 - 各サービスのホスト側ポートは上記のとおり固定です。変更したい場合は `docker-compose.yml` を編集してください。
+
+### ログフォーマット
+
+すべてのサービスは統一されたログフォーマットでリクエストを記録します：
+
+```
+[node-proxy]   GET http://127.0.0.1:8000/api?search_code=1070052 -> 200
+[php-proxy]    GET http://127.0.0.1:8001/api?search_code=1070052 -> 200
+[ruby-proxy]   GET http://127.0.0.1:8002/api?search_code=1070052 -> 200
+[python-proxy] GET http://127.0.0.1:8003/api?search_code=1070052 -> 200
+```
+
+各サービスのフレームワーク固有のログ（Sinatra や Flask のデフォルトアクセスログなど）は抑制されており、上記の統一フォーマットのみが出力されます。
+
+### 環境変数
+
+各サービスは以下の環境変数で動作をカスタマイズできます（`docker-compose.yml` で設定済み）：
+
+- `BIND_HOST` – コンテナ内でバインドするアドレス（通常 `0.0.0.0`）
+- `PORT` – コンテナ内でリッスンするポート
+- `PUBLIC_HOST` – ホストからアクセスする際のアドレス（通常 `127.0.0.1`）
+- `PUBLIC_PORT` – ホストからアクセスする際のポート（各サービスで異なる）
+
+これらはログ出力時の URL 構築に使用されます。
 
 ## API 挙動
 
@@ -179,6 +214,38 @@ docker compose up python
 - シンプルなフォームで郵便番号を入力し、`fetch` で `/api?search_code=...` を呼び出します。
 - レスポンス内の住所データをフォームの都道府県・市区町村・町名欄に反映します。
 - ブラウザのオートコンプリートを抑制するため、`autocomplete="off"` などの属性を設定しています。
+
+## トラブルシューティング
+
+### ログが表示されない
+
+- **PHP の場合**: `php/docker-entrypoint.sh` はイメージに含まれるため、変更後は `docker compose build --no-cache php` で再ビルドが必要です。
+- **Ruby/Python の場合**: `$stdout.sync = true`（Ruby）や `sys.stdout.reconfigure(line_buffering=True)`（Python）で即座に flush されます。コンテナを再起動してください。
+- **ログ確認**: `docker compose logs <service>` で個別サービスのログを確認できます。
+
+### ポート衝突
+
+`docker-compose.yml` で定義されたポート（8000-8003）が既に使用されている場合、該当サービスの `ports` セクションを編集してください。
+
+### コンテナの再起動・再ビルド
+
+```bash
+# サービスを再起動（設定変更を反映）
+docker compose restart <service>
+
+# サービスを再作成（コンテナを作り直す）
+docker compose up --force-recreate <service>
+
+# イメージを再ビルド（Dockerfile や COPY 対象が変わった場合）
+docker compose build --no-cache <service>
+docker compose up --force-recreate <service>
+```
+
+### アクセストークン取得エラー
+
+- `credentials.json` のパスと内容が正しいか確認してください。
+- Japan Post 側で登録した IP アドレス（`127.0.0.1` や実行環境の IP）が許可されているか確認してください。
+- `shared/runtime/access_token.json` を削除して再取得を試してください。
 
 ## 運用上の注意
 
